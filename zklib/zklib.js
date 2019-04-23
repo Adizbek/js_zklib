@@ -8,24 +8,24 @@ const {defaultTo, createHeader, checkValid, removeTcpHeader} = require('./utils'
 const {Commands, USHRT_MAX, ConnectionTypes} = require('./constants');
 
 /**
-  @typedef {object} Options
-  @property {string} ip - Zk device ipAddress
-  @property {?number} [port] - Zk device port
-  @property {number} inport - Socket port to bind to
-  @property {?number} [timeout] - Zk device port
-  @property {?string} [attendanceParser] - Zk device port
-  @property {?string} [connectionType] - Connection type UDP/TCP
+ @typedef {object} Options
+ @property {string} ip - Zk device ipAddress
+ @property {?number} [port] - Zk device port
+ @property {number} inport - Socket port to bind to
+ @property {?number} [timeout] - Zk device port
+ @property {?string} [attendanceParser] - Zk device port
+ @property {?string} [connectionType] - Connection type UDP/TCP
  */
 
 /**
-  @property {string} ip - Zk device ipAddress
-  @property {number} [port] - Zk device port
-  @property {number} inport - Socket port to bind to
-  @property {number} [timeout] - Zk device port
-  @property {string} [attendanceParser] - Zk device port
-  @property {string} [connectionType] - Connection type UDP/TCP
-  @property {('message' | 'data')} DATA_EVENT
-  @property {dgram.Socket | net.Socket} socket
+ @property {string} ip - Zk device ipAddress
+ @property {number} [port] - Zk device port
+ @property {number} inport - Socket port to bind to
+ @property {number} [timeout] - Zk device port
+ @property {string} [attendanceParser] - Zk device port
+ @property {string} [connectionType] - Connection type UDP/TCP
+ @property {('message' | 'data')} DATA_EVENT
+ @property {dgram.Socket | net.Socket} socket
  */
 class ZKLib {
   /**
@@ -36,6 +36,7 @@ class ZKLib {
 
     this.ip = options.ip;
     this.port = defaultTo(options.port, 4370);
+    this.onMessage = options.onMessage;
     this.inport = options.inport;
     this.timeout = options.timeout;
     this.attendanceParser = defaultTo(options.attendanceParser, attParserLegacy.name);
@@ -99,7 +100,6 @@ class ZKLib {
     };
 
     this.socket.once(this.DATA_EVENT, handleOnData);
-
     // console.log(buf.toString('hex'));
 
     this.send(buf, 0, buf.length, err => {
@@ -137,6 +137,14 @@ class ZKLib {
       cb();
     });
 
+    socket.on('message', (msg, rinfo) => {
+      // first 4 byte is event code
+      // second 4 byte is event type
+      // third 8 byte card number
+
+      this.onMessage && this.onMessage(msg, rinfo);
+    });
+
     socket.bind(port);
 
     return socket;
@@ -165,7 +173,7 @@ class ZKLib {
 
     socket.connect(
       this.port,
-      this.ip
+      this.ip,
     );
 
     return socket;

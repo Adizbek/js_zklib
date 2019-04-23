@@ -71,15 +71,17 @@ class ZkUser {
    * @param {string} password
    * @param {string} name
    * @param {number} user_id
+   * @param {number} cardno
    * @param {(err: Error) => void} cb
    */
-  setUser(uid, password = '', name = '', user_id, cb) {
+  setUser(uid, password = '', name = '', user_id, cardno, cb) {
     const command_string = Buffer.alloc(72);
 
     command_string.writeUInt16LE(uid, 0);
     command_string[2] = 0;
     command_string.write(password, 3, 11);
-    command_string.write(name, 11, 39);
+    command_string.write(name, 11, 35);
+    command_string.writeUInt32LE(cardno, 35);
     command_string[39] = 1;
     command_string.writeUInt32LE(0, 40);
     command_string.write(user_id ? user_id.toString(10) : '', 48);
@@ -99,6 +101,13 @@ class ZkUser {
     command_string.write(uid.toString());
 
     this.executeCmd(Commands.START_ENROLL, command_string, cb);
+  }
+
+  regEvent(flags, cb) {
+    const command_string = new Buffer(4);
+    command_string.writeUInt32LE(flags, 0);
+
+    this.executeCmd(Commands.REG_EVENT, command_string, cb);
   }
 
   /**
