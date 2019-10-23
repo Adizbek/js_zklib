@@ -1,7 +1,7 @@
-const dgram = require('dgram');
+const dgram = require('dgram')
 
-const {Commands, States, ConnectionTypes} = require('./constants');
-const {createHeader, checkValid, removeTcpHeader} = require('./utils');
+const { Commands, States, ConnectionTypes } = require('./constants')
+const { createHeader, checkValid, removeTcpHeader } = require('./utils')
 
 // /**
 //  *
@@ -27,7 +27,7 @@ class ZkUser {
    *
    * @param {Buffer} userdata
    */
-  decodeUserData(userdata) {
+  decodeUserData (userdata) {
     const user = {
       uid: userdata.readUInt16BE(0),
       role: userdata.readUInt16BE(2),
@@ -47,9 +47,9 @@ class ZkUser {
         .toString('ascii')
         .split('\0')
         .shift(),
-    };
+    }
 
-    return user;
+    return user
   }
 
   /**
@@ -57,12 +57,12 @@ class ZkUser {
    * @param {number} uid
    * @param {(err: Error) => void} cb
    */
-  delUser(uid, cb) {
-    const command_string = Buffer.alloc(2);
+  delUser (uid, cb) {
+    const command_string = Buffer.alloc(2)
 
-    command_string.writeUInt16LE(uid, 0);
+    command_string.writeUInt16LE(uid, 0)
 
-    this.executeCmd(Commands.DELETE_USER, command_string, cb);
+    this.executeCmd(Commands.DELETE_USER, command_string, cb)
   }
 
   /**
@@ -74,19 +74,19 @@ class ZkUser {
    * @param {number} cardno
    * @param {(err: Error) => void} cb
    */
-  setUser(uid, password = '', name = '', user_id, cardno, cb) {
-    const command_string = Buffer.alloc(72);
+  setUser (uid, password = '', name = '', user_id, cardno, cb) {
+    const command_string = Buffer.alloc(72)
 
-    command_string.writeUInt16LE(uid, 0);
-    command_string[2] = 0;
-    command_string.write(password, 3, 11);
-    command_string.write(name, 11, 35);
-    command_string.writeUInt32LE(cardno, 35);
-    command_string[39] = 1;
-    command_string.writeUInt32LE(0, 40);
-    command_string.write(user_id ? user_id.toString(10) : '', 48);
+    command_string.writeUInt16LE(uid, 0)
+    command_string[2] = 0
+    command_string.write(password, 3, 11)
+    command_string.write(name, 11, 35)
+    command_string.writeUInt32LE(cardno, 35)
+    command_string[39] = 1
+    command_string.writeUInt32LE(0, 40)
+    command_string.write(user_id ? user_id.toString(10) : '', 48)
 
-    this.executeCmd(Commands.USER_WRQ, command_string, cb);
+    this.executeCmd(Commands.USER_WRQ, command_string, cb)
   }
 
   /**
@@ -94,168 +94,169 @@ class ZkUser {
    * @param {number} uid
    * @param {(err: Error) => void} cb
    */
-  enrollUser(uid, cb) {
-    const command = Commands.START_ENROLL;
-    const command_string = new Buffer(2);
+  enrollUser (uid, cb) {
+    const command = Commands.START_ENROLL
+    const command_string = new Buffer(2)
 
-    command_string.write(uid.toString());
+    command_string.write(uid.toString())
 
-    this.executeCmd(Commands.START_ENROLL, command_string, cb);
+    this.executeCmd(Commands.START_ENROLL, command_string, cb)
   }
 
-  regEvent(flags, cb) {
-    const command_string = new Buffer(4);
-    command_string.writeUInt32LE(flags, 0);
+  regEvent (flags, cb) {
+    const command_string = new Buffer(4)
+    command_string.writeUInt16LE(flags, 0)
+    command_string.writeUInt16LE(0, 2)
 
-    this.executeCmd(Commands.REG_EVENT, command_string, cb);
+    this.executeCmd(Commands.REG_EVENT, command_string, cb)
   }
 
   /**
    *
    * @param {(err: Error, users: object[]) => void} cb
    */
-  getUser(cb) {
-    const reqData = Buffer.from([0x05]);
+  getUser (cb) {
+    const reqData = Buffer.from([0x05])
 
-    this.reply_id++;
+    this.reply_id++
 
-    const buf = createHeader(Commands.USERTEMP_RRQ, this.session_id, this.reply_id, reqData, this.connectionType);
+    const buf = createHeader(Commands.USERTEMP_RRQ, this.session_id, this.reply_id, reqData, this.connectionType)
 
-    let state = States.FIRST_PACKET;
-    let total_bytes = 0;
-    let bytes_recv = 0;
+    let state = States.FIRST_PACKET
+    let total_bytes = 0
+    let bytes_recv = 0
 
-    let rem = Buffer.from([]);
-    let offset = 0;
+    let rem = Buffer.from([])
+    let offset = 0
 
-    const userdata_size = 72;
-    const trim_first = 11;
-    const trim_others = this.connectionType === ConnectionTypes.UDP ? 8 : 0;
+    const userdata_size = 72
+    const trim_first = 11
+    const trim_others = this.connectionType === ConnectionTypes.UDP ? 8 : 0
 
-    const users = [];
+    const users = []
 
     const internalCallback = (err, data) => {
-      this.socket.removeListener(this.DATA_EVENT, handleOnData);
+      this.socket.removeListener(this.DATA_EVENT, handleOnData)
 
-      cb(err, data);
-    };
+      cb(err, data)
+    }
 
     /**
      *
      * @param {Buffer} reply
      */
     const handleOnData = reply => {
-      reply = this.connectionType === ConnectionTypes.UDP ? reply : removeTcpHeader(reply);
+      reply = this.connectionType === ConnectionTypes.UDP ? reply : removeTcpHeader(reply)
 
       switch (state) {
         case States.FIRST_PACKET:
-          state = States.PACKET;
+          state = States.PACKET
 
           if (reply && reply.length) {
             // total_bytes = getSizeUser(reply);
-            total_bytes = reply.readUInt32LE(8);
+            total_bytes = reply.readUInt32LE(8)
 
             if (total_bytes <= 0) {
-              internalCallback(new Error('no data'));
-              return;
+              internalCallback(new Error('no data'))
+              return
             }
 
             if (reply.length > 16) {
-              handleOnData(reply.slice(16));
+              handleOnData(reply.slice(16))
             }
           } else {
-            internalCallback(new Error('zero length reply'));
-            return;
+            internalCallback(new Error('zero length reply'))
+            return
           }
 
-          break;
+          break
 
         case States.PACKET:
           if (bytes_recv == 0) {
-            offset = trim_first;
-            bytes_recv = 4;
+            offset = trim_first
+            bytes_recv = 4
           } else {
-            offset = trim_others;
+            offset = trim_others
           }
 
           while (reply.length + rem.length - offset >= userdata_size) {
-            const userdata = Buffer.alloc(userdata_size);
+            const userdata = Buffer.alloc(userdata_size)
 
             if (rem.length > 0) {
-              rem.copy(userdata);
-              reply.copy(userdata, rem.length, offset);
-              offset += userdata_size - rem.length;
-              rem = Buffer.from([]);
+              rem.copy(userdata)
+              reply.copy(userdata, rem.length, offset)
+              offset += userdata_size - rem.length
+              rem = Buffer.from([])
             } else {
-              reply.copy(userdata, 0, offset);
-              offset += userdata_size;
+              reply.copy(userdata, 0, offset)
+              offset += userdata_size
             }
 
-            const user = this.decodeUserData(userdata);
-            users.push(user);
+            const user = this.decodeUserData(userdata)
+            users.push(user)
 
-            bytes_recv += userdata_size;
+            bytes_recv += userdata_size
 
             if (bytes_recv == total_bytes) {
               // state = States.FINISHED;
 
-              internalCallback(null, users);
-              return;
+              internalCallback(null, users)
+              return
             }
           }
 
-          rem = Buffer.alloc(reply.length - offset);
-          reply.copy(rem, 0, offset);
+          rem = Buffer.alloc(reply.length - offset)
+          reply.copy(rem, 0, offset)
 
-          break;
+          break
 
         // case States.FINISHED:
         //   internalCallback(null, users);
 
         //   break;
       }
-    };
+    }
 
-    this.socket.on(this.DATA_EVENT, handleOnData);
+    this.socket.on(this.DATA_EVENT, handleOnData)
 
     this.send(buf, 0, buf.length, err => {
       if (err) {
-        internalCallback && internalCallback(err);
+        internalCallback && internalCallback(err)
       }
-    });
+    })
   }
 
   /**
    * @deprecated since version 0.2.0. Use getUser instead
    */
-  getuser(cb) {
-    console.warn('getuser() function will deprecated soon, please use getUser()');
-    return this.getUser(cb);
+  getuser (cb) {
+    console.warn('getuser() function will deprecated soon, please use getUser()')
+    return this.getUser(cb)
   }
 
   /**
    * @deprecated since version 0.2.0. Use enrollUser instead
    */
-  enrolluser(id, cb) {
-    console.warn('enrolluser() function will deprecated soon, please use enrollUser()');
-    return this.enrollUser(id, cb);
+  enrolluser (id, cb) {
+    console.warn('enrolluser() function will deprecated soon, please use enrollUser()')
+    return this.enrollUser(id, cb)
   }
 
   /**
    * @deprecated since version 0.2.0. Use setUser instead
    */
-  setuser(uid, password = '', name = '', user_id, cb) {
-    console.warn('setuser() function will deprecated soon, please use setUser()');
-    return this.setUser(uid, password, name, user_id, cb);
+  setuser (uid, password = '', name = '', user_id, cb) {
+    console.warn('setuser() function will deprecated soon, please use setUser()')
+    return this.setUser(uid, password, name, user_id, cb)
   }
 
   /**
    * @deprecated since version 0.2.0. Use delUser instead
    */
-  deluser(id, cb) {
-    console.warn('deluser() function will deprecated soon, please use delUser()');
-    return this.delUser(id, cb);
+  deluser (id, cb) {
+    console.warn('deluser() function will deprecated soon, please use delUser()')
+    return this.delUser(id, cb)
   }
 }
 
-module.exports = ZkUser;
+module.exports = ZkUser
