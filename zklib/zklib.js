@@ -8,6 +8,20 @@ const { defaultTo, createHeader, checkValid, removeTcpHeader } = require('./util
 const { Commands, USHRT_MAX, ConnectionTypes } = require('./constants')
 
 /**
+ * This callback is displayed as part of the Requester class.
+ * @callback onMessageCallback
+ * @param {Buffer} data
+ * @param {any} deviceInfo
+ *
+ */
+
+/**
+ * This callback is displayed as part of the Requester class.
+ * @callback onNewAttendanceCallback
+ * @param {string} userId
+ */
+
+/**
  @typedef {object} Options
  @property {string} ip - Zk device ipAddress
  @property {?number} [port] - Zk device port
@@ -15,6 +29,8 @@ const { Commands, USHRT_MAX, ConnectionTypes } = require('./constants')
  @property {?number} [timeout] - Zk device port
  @property {?string} [attendanceParser] - Zk device port
  @property {?string} [connectionType] - Connection type UDP/TCP
+ @property {onNewAttendanceCallback} onNewAttendance - onNewAttendance callback
+ @property {onMessageCallback} onMessage - OnMessage callback
  */
 
 /**
@@ -37,6 +53,7 @@ class ZKLib {
     this.ip = options.ip
     this.port = defaultTo(options.port, 4370)
     this.onMessage = options.onMessage
+    this.onNewAttendance = options.onNewAttendance
     this.inport = options.inport
     this.timeout = options.timeout
     this.attendanceParser = defaultTo(options.attendanceParser, attParserLegacy.name)
@@ -147,6 +164,7 @@ class ZKLib {
       // second 4 byte is event type
       // third 8 byte card number
 
+      this.parseEvent(msg)
       this.onMessage && this.onMessage(msg, rinfo)
     })
 
@@ -234,7 +252,6 @@ class ZKLib {
     const key = this.generateCommKey(0, sessionId)
     this.executeCmd(1102, key, (err, resp) => {
       this.regEvent(65535, function (err, repl) {
-      debugger
       })
     })
   }
@@ -376,6 +393,23 @@ class ZKLib {
   closeTcpSocket (socket) {
     socket.removeAllListeners('data')
     socket.end()
+  }
+
+  /**
+   * @param {Buffer} msg
+   */
+  parseEvent (msg) {
+    const cmd = msg.readUInt16LE(0)
+    const event = msg.readUInt16LE(4)
+    if (cmd === 500) {
+      if (event === 1) {
+        const id = parseInt(msg.toString('utf-8', 8, 14))
+
+        if (!isNaN(id)) {
+          this.onNewAttendance(id)
+        }
+      }
+    }
   }
 }
 
